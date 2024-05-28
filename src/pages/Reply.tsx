@@ -1,17 +1,30 @@
-"use client";
-
-import React, { useState } from "react";
-import { Input } from "@/components/ui/input";
+import { useState, useRef } from "react";
+import TweetInput from "@/components/TweetInput";
+import Hashtags from "@/components/Hashtags";
+import Indication from "@/components/Indication";
+import BotProfiles from "@/components/BotProfiles";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Tweet } from "react-twitter-widgets";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import axios from 'axios';
 
 const Reply = () => {
+
+
   const [tweetId, setTweetId] = useState("");
   const [hashtags, setHashtags] = useState<string[]>([]);
   const [hashtagInput, setHashtagInput] = useState("");
   const [indication, setIndication] = useState("");
+  const [loading, setLoading] = useState(false);
   const [botProfiles, setBotProfiles] = useState({
     estudianteUniversitario: false,
     jovenTrabajador: false,
@@ -19,6 +32,25 @@ const Reply = () => {
     profesionalMedianaEdad: false,
     jubilado: false,
   });
+  const [botCounts, setBotCounts] = useState({
+    estudianteUniversitario: 0,
+    jovenTrabajador: 0,
+    jovenEmprendedor: 0,
+    profesionalMedianaEdad: 0,
+    jubilado: 0,
+  });
+  const [previewResponse, setPreviewResponse] = useState(null);
+  const totalBots = 4;
+  const botsDisponibles = totalBots - Object.values(botCounts).reduce((a, b) => a + b, 0);
+  const cancelRef = useRef(null);
+
+  const profileIds = {
+    estudianteUniversitario: 1,
+    jovenTrabajador: 2,
+    jovenEmprendedor: 3,
+    profesionalMedianaEdad: 4,
+    jubilado: 5,
+  };
 
   const handleAddHashtag = () => {
     if (hashtagInput.trim() !== "") {
@@ -34,173 +66,118 @@ const Reply = () => {
     });
   };
 
-  const handleEngage = () => {
-    // Handle the engage action here
-    console.log("Engage clicked");
+  const handlePreview = async () => {
+    if (tweetId.trim() !== "") {
+      setLoading(true);
+      try {
+        const firstSelectedProfile = Object.keys(botProfiles).find(profile => botProfiles[profile] as boolean);
+        const requestData = {
+          tweetId: tweetId,
+          hashtags: hashtags,
+          indication: indication,
+          profile: firstSelectedProfile ? { id: profileIds[firstSelectedProfile] } : {}
+        };
+        const response = await axios.post('http://localhost:8000/simulate_tweet', requestData);
+        setPreviewResponse(response.data);
+      } catch (error) {
+        console.error('Error making API request:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleEngage = async () => {
+    setLoading(true);
+    try {
+      const botAssignments = Object.keys(botProfiles).reduce((acc, profile) => {
+        if (botProfiles[profile]) {
+          acc.push({
+            profileId: profileIds[profile],
+            botCount: botCounts[profile],
+          });
+        }
+        return acc;
+      }, []);
+  
+      const requestData = {
+        tweetId: tweetId,
+        hashtags: hashtags,
+        indication: indication,
+        botAssignments: botAssignments,
+      };
+  
+      await axios.post('http://localhost:8000/respond_to_tweet', requestData);
+    } catch (error) {
+      console.error('Error making API request:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="p-4">
-      <div className="mb-4" style={{ paddingLeft: "60px" }}>
-        <label
-          className="block text-gray-700 text-sm font-bold mb-2"
-          htmlFor="tweetId"
-        >
-          Tweet id:
-        </label>
-        <div className="flex w-1/2 items-center space-x-2">
-          <Input
-            id="tweetId"
-            type="text"
-            value={tweetId}
-            onChange={(e) => setTweetId(e.target.value)}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+    <div className="p-4 flex">
+      <div className="w-1/2" style={{ paddingLeft: "77px" }}>
+        <div className="w-full">
+          <TweetInput tweetId={tweetId} setTweetId={setTweetId} handlePreview={handlePreview} />
+          <Hashtags hashtags={hashtags} hashtagInput={hashtagInput} setHashtagInput={setHashtagInput} handleAddHashtag={handleAddHashtag} />
+          <Indication indication={indication} setIndication={setIndication} />
+          <div className="mb-4 text-center py-4">
+            <p>
+              Bots disponibles:{" "}
+              {botsDisponibles >= 0 ? botsDisponibles : "Ya no hay bots disponibles"}
+            </p>
+          </div>
+          <BotProfiles
+            botProfiles={botProfiles}
+            handleBotProfileChange={handleBotProfileChange}
+            botCounts={botCounts}
+            setBotCounts={setBotCounts}
           />
-          <Button
-            type="submit"
-            className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
-          >
-            PREVIEW
-          </Button>
-        </div>
-      </div>
-      <div className="mb-4" style={{ paddingLeft: "60px" }}>
-        <label
-          className="block text-gray-700 text-sm font-bold mb-2"
-          htmlFor="hashtags"
-        >
-          Hashtags:
-        </label>
-        <div className="flex w-1/2 items-center space-x-2">
-          <Input
-            id="hashtags"
-            type="text"
-            value={hashtagInput}
-            onChange={(e) => setHashtagInput(e.target.value)}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-          />
-          <Button
-            onClick={handleAddHashtag}
-            type="submit"
-            className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
-          >
-            ADD
-          </Button>
-        </div>
-        <div className="mt-2">
-          {hashtags.map((hashtag, index) => (
-            <span
-              key={index}
-              className="inline-block bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mb-2"
-            >
-              #{hashtag}
-            </span>
-          ))}
-        </div>
-      </div>
-      <div className="mb-4" style={{ paddingLeft: "60px" }}>
-        <Label
-          className="block text-gray-700 text-sm font-bold mb-2"
-          htmlFor="indication"
-        >
-          Indication:
-        </Label>
-        <div className="flex w-1/2 items-center space-x-2">
-          <Textarea
-            id="indication"
-            value={indication}
-            onChange={(e) => setIndication(e.target.value)}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-          />
-        </div>
-      </div>
-      <div className="mb-4" style={{ paddingLeft: "60px" }}>
-        <label className="block text-gray-700 text-sm font-bold mb-2">
-          Escoge el perfil de los bots:
-        </label>
-        <div className="flex flex-col w-1/2 space-y-2">
           <div className="flex items-center space-x-2">
-            <Checkbox
-              id="estudianteUniversitario"
-              checked={botProfiles.estudianteUniversitario}
-              onCheckedChange={() =>
-                handleBotProfileChange("estudianteUniversitario")
-              }
-            />
-            <label
-              htmlFor="estudianteUniversitario"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            <Button
+              className="text-black border bg-white w-60 h-11 rounded-xl hover:border-2"
+              onClick={handlePreview} // onClick event added here
             >
-              Estudiante Universitario
-            </label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="jovenTrabajador"
-              checked={botProfiles.jovenTrabajador}
-              onCheckedChange={() => handleBotProfileChange("jovenTrabajador")}
-            />
-            <label
-              htmlFor="jovenTrabajador"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              Joven Trabajador
-            </label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="jovenEmprendedor"
-              checked={botProfiles.jovenEmprendedor}
-              onCheckedChange={() => handleBotProfileChange("jovenEmprendedor")}
-            />
-            <label
-              htmlFor="jovenEmprendedor"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              Joven Emprendedor
-            </label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="profesionalMedianaEdad"
-              checked={botProfiles.profesionalMedianaEdad}
-              onCheckedChange={() =>
-                handleBotProfileChange("profesionalMedianaEdad")
-              }
-            />
-            <label
-              htmlFor="profesionalMedianaEdad"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              Profesional de Mediana Edad
-            </label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="jubilado"
-              checked={botProfiles.jubilado}
-              onCheckedChange={() => handleBotProfileChange("jubilado")}
-            />
-            <label
-              htmlFor="jubilado"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              Jubilado
-            </label>
+              PREVIEW
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  className="bg-black hover:bg-customRed text-white font-bold w-60 h-11 rounded-xl"
+                  style={{ opacity: 1 }}
+                >
+                  ENGAGE
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Crees en la democracia?</AlertDialogTitle>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel ref={cancelRef}>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleEngage}>Continuar</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       </div>
-      <div
-        className="flex w-1/2 items-center space-x-2"
-        style={{ paddingLeft: "60px" }}
-      >
-        <Button
-          onClick={handleEngage}
-          className="bg-black hover:bg-customRed text-white font-bold w-60 h-11 rounded"
-          style={{ opacity: 1 }}
-        >
-          ENGAGE
-        </Button>
+      <div className="w-1/2 px-10">
+        <div className=" p-2" style={{ top: '82px', left: '854px', width: '314px', height: '399px', position: 'absolute' }}>
+          {loading ? (
+            <div>Loading...</div>
+          ) : (
+            tweetId && <Tweet tweetId={tweetId} />
+          )}
+        </div>
+        <div className="border p-2 mt-40 rounded-xl" style={{ position: 'absolute', top: '481px', left: '854px', width: '314px' }}>
+          {previewResponse ? (
+            <div>{previewResponse}</div>
+          ) : (
+            <div>Preview del msj</div>
+          )}
+        </div>
       </div>
     </div>
   );
