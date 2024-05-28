@@ -19,7 +19,6 @@ import axios from 'axios';
 
 const Reply = () => {
 
-
   const [tweetId, setTweetId] = useState("");
   const [hashtags, setHashtags] = useState<string[]>([]);
   const [hashtagInput, setHashtagInput] = useState("");
@@ -39,7 +38,7 @@ const Reply = () => {
     profesionalMedianaEdad: 0,
     jubilado: 0,
   });
-  const [previewResponse, setPreviewResponse] = useState(null);
+  const [response, setResponse] = useState(null);
   const totalBots = 4;
   const botsDisponibles = totalBots - Object.values(botCounts).reduce((a, b) => a + b, 0);
   const cancelRef = useRef(null);
@@ -70,15 +69,15 @@ const Reply = () => {
     if (tweetId.trim() !== "") {
       setLoading(true);
       try {
-        const firstSelectedProfile = Object.keys(botProfiles).find(profile => botProfiles[profile] as boolean);
+        const firstSelectedProfile = Object.keys(botProfiles).find(profile => botProfiles[profile as keyof typeof botProfiles]);
         const requestData = {
           tweetId: tweetId,
           hashtags: hashtags,
           indication: indication,
-          profile: firstSelectedProfile ? { id: profileIds[firstSelectedProfile] } : {}
+          profile: firstSelectedProfile ? { id: profileIds[firstSelectedProfile as keyof typeof profileIds] } : {}
         };
         const response = await axios.post('http://localhost:8000/simulate_tweet', requestData);
-        setPreviewResponse(response.data);
+        setResponse(response.data);
       } catch (error) {
         console.error('Error making API request:', error);
       } finally {
@@ -89,16 +88,17 @@ const Reply = () => {
 
   const handleEngage = async () => {
     setLoading(true);
+
     try {
       const botAssignments = Object.keys(botProfiles).reduce((acc, profile) => {
-        if (botProfiles[profile]) {
+        if (botProfiles[profile as keyof typeof botProfiles]) {
           acc.push({
-            profileId: profileIds[profile],
-            botCount: botCounts[profile],
+            profileId: profileIds[profile as keyof typeof profileIds],
+            botCount: botCounts[profile as keyof typeof botCounts],
           });
         }
         return acc;
-      }, []);
+      }, [] as { profileId: number; botCount: number }[]);
   
       const requestData = {
         tweetId: tweetId,
@@ -108,8 +108,10 @@ const Reply = () => {
       };
   
       await axios.post('http://localhost:8000/respond_to_tweet', requestData);
+      setResponse("Engagement completado"); // Set a hardcoded response
     } catch (error) {
       console.error('Error making API request:', error);
+      setResponse('Error desconocido');
     } finally {
       setLoading(false);
     }
@@ -172,8 +174,8 @@ const Reply = () => {
           )}
         </div>
         <div className="border p-2 mt-40 rounded-xl" style={{ position: 'absolute', top: '481px', left: '854px', width: '314px' }}>
-          {previewResponse ? (
-            <div>{previewResponse}</div>
+          {response ? (
+            <div>{response}</div>
           ) : (
             <div>Preview del msj</div>
           )}
